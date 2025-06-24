@@ -136,3 +136,4 @@ dist
 .pnp.*
 /ccipbird/.eliza
 /ccipbird/src/__tests__
+/ccipbird/.elizadb-test
