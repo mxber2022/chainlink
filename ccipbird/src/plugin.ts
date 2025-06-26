@@ -14,7 +14,11 @@ import {
   logger,
 } from '@elizaos/core';
 import { z } from 'zod';
-
+import * as CCIP from '@chainlink/ccip-js'
+import { createPublicClient, createWalletClient, custom, http, parseEther } from 'viem'
+import { mainnet, sepolia } from 'viem/chains'
+import { privateKeyToAccount } from 'viem/accounts';
+import { transferFromFirstAvailableChain } from './utils/transferFromChains';
 /**
  * Define the configuration schema for the plugin with the following properties:
  *
@@ -49,10 +53,10 @@ const configSchema = z.object({
  * @property {Function} handler - The function that handles the action
  * @property {Object[]} examples - Array of examples for the action
  */
-const helloWorldAction: Action = {
-  name: 'HELLO_WORLD',
-  similes: ['GREET', 'SAY_HELLO'],
-  description: 'Responds with a simple hello world message',
+const ccipTransferAction: Action = { 
+  name: 'CCIP_TRANSFER',
+  similes: ['SEND_PAYMENT', 'TRANSFER_TOKENS', 'CROSS_CHAIN_TRANSFER'],
+  description: 'Execute a cross-chain token transfer using Chainlink CCIP',
 
   validate: async (_runtime: IAgentRuntime, _message: Memory, _state: State): Promise<boolean> => {
     // Always valid
@@ -68,12 +72,28 @@ const helloWorldAction: Action = {
     _responses: Memory[]
   ) => {
     try {
-      logger.info('Handling HELLO_WORLD action');
+      
+      logger.info('Handling CCIP_TRANSFER action');
 
+      // const client = createWalletClient({
+      //   chain: sepolia,
+      //   transport: http("https://eth-sepolia.g.alchemy.com/v2/pxb3cwnOJLo19ytBM10xZ2HmHUMWEnj3")
+      // })
+
+      // const account = privateKeyToAccount("")
+
+      // const hash = await client.sendTransaction({
+      //   account, 
+      //   to: '0x98692B795D1fB6072de084728f7cC6d56100b807',
+      //   value: parseEther('0.001')
+      // })
+
+      const result = await transferFromFirstAvailableChain();
+      const { txHash, chain } = result!;
       // Simple response content
       const responseContent: Content = {
-        text: 'hello world!',
-        actions: ['HELLO_WORLD'],
+        text: txHash,
+        actions: ['CCIP_TRANSFER'],
         source: message.content.source,
       };
 
@@ -82,7 +102,7 @@ const helloWorldAction: Action = {
 
       return responseContent;
     } catch (error) {
-      logger.error('Error in HELLO_WORLD action:', error);
+      logger.error('Error in CCIP_TRANSFER action:', error);
       throw error;
     }
   },
@@ -92,14 +112,14 @@ const helloWorldAction: Action = {
       {
         name: '{{name1}}',
         content: {
-          text: 'Can you say hello?',
+          text: 'Please transfer 0.001 ETH to 0x98692B795D1fB6072de084728f7cC6d56100b807 using CCIP.',
         },
       },
       {
         name: '{{name2}}',
         content: {
-          text: 'hello world!',
-          actions: ['HELLO_WORLD'],
+          text: 'Transfer complete! Transaction hash: 0x1234abcd... (example)',
+          actions: ['CCIP_TRANSFER'],
         },
       },
     ],
@@ -248,7 +268,7 @@ const plugin: Plugin = {
     ],
   },
   services: [StarterService],
-  actions: [helloWorldAction],
+  actions: [ccipTransferAction],
   providers: [helloWorldProvider],
 };
 
