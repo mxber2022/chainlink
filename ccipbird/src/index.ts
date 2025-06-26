@@ -141,7 +141,8 @@ const initCharacter = ({ runtime }: { runtime: IAgentRuntime }) => {
 export const projectAgent: ProjectAgent = {
   character,
   init: async (runtime: IAgentRuntime) => await initCharacter({ runtime }),
-  // plugins: [starterPlugin], <-- Import custom plugins here
+  // <-- Import custom plugins here
+   plugins: [starterPlugin],
 };
 const project: Project = {
   agents: [projectAgent],
