@@ -30,9 +30,23 @@ import {
     { name: 'Sepolia', rpcUrl: 'https://eth-sepolia.g.alchemy.com/v2/pxb3cwnOJLo19ytBM10xZ2HmHUMWEnj3', chain: sepolia },
   ];
   
-  export async function transferFromFirstAvailableChain(): Promise<{ chain: string; txHash: string } | null> {
+  export async function transferFromFirstAvailableChain(
+    token: string,
+    chain: string,
+    recipient: string,
+    amount: string
+  ): Promise<{ txhash: string } | null> {
     const account = privateKeyToAccount(PRIVATE_KEY as `0x${string}`);
   
+    console.log(`
+        🔄 Transfer Request:
+        ----------------------------
+        🔹 Token:     ${token}
+        🔹 Chain:     ${chain}
+        🔹 Recipient: ${recipient}
+        🔹 Amount:    ${amount}
+        `);
+        
     console.log(`\n🔐 Starting scan for available balances...`);
     console.log(`🔎 Wallet Address: ${account.address}`);
     console.log(`🎯 Transfer Target: ${TO_ADDRESS}\n`);
@@ -84,7 +98,7 @@ import {
   
           console.log(`✅ Sent from ${name}: ${formatEther(sendAmount)} ${chain.nativeCurrency.symbol}`);
           console.log(`🔗 TX Hash: ${txHash}\n`);
-          return { chain: name, txHash };
+          return { txhash: txHash };
         } else {
           console.log(`🚫 Balance too low to transfer on ${name}\n`);
         }

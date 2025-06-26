@@ -12,12 +12,9 @@ import {
   Service,
   type State,
   logger,
+  parseKeyValueXml
 } from '@elizaos/core';
 import { z } from 'zod';
-import * as CCIP from '@chainlink/ccip-js'
-import { createPublicClient, createWalletClient, custom, http, parseEther } from 'viem'
-import { mainnet, sepolia } from 'viem/chains'
-import { privateKeyToAccount } from 'viem/accounts';
 import { transferFromFirstAvailableChain } from './utils/transferFromChains';
 /**
  * Define the configuration schema for the plugin with the following properties:
@@ -25,18 +22,58 @@ import { transferFromFirstAvailableChain } from './utils/transferFromChains';
  * @param {string} EXAMPLE_PLUGIN_VARIABLE - The name of the plugin (min length of 1, optional)
  * @returns {object} - The configured schema object
  */
-const configSchema = z.object({
-  EXAMPLE_PLUGIN_VARIABLE: z
-    .string()
-    .min(1, 'Example plugin variable is not provided')
-    .optional()
+// const configSchema = z.object({
+//   EXAMPLE_PLUGIN_VARIABLE: z
+//     .string()
+//     .min(1, 'Example plugin variable is not provided')
+//     .optional()
+//     .transform((val) => {
+//       if (!val) {
+//         console.warn('Warning: Example plugin variable is not provided');
+//       }
+//       return val;
+//     }),
+// });
+;
+const transferSchema = z.object({
+  amount: z.string()
+    .regex(/^[0-9]*\.?[0-9]+$/, 'Amount must be a number as a string')
     .transform((val) => {
-      if (!val) {
-        console.warn('Warning: Example plugin variable is not provided');
-      }
+      logger.info('Validating amount:', val);
+      return val;
+    }),
+  token: z.string().default('ETH'),
+  chain: z.enum(['ethereum', 'sepolia', 'base', 'polygon'])
+    .transform((val) => {
+      logger.info('Chain selected:', val);
+      return val;
+    }),
+  to: z.string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid Ethereum address')
+    .transform((val) => {
+      logger.info('Recipient address:', val);
       return val;
     }),
 });
+
+const tokenTransferTemplate = `Extract the token symbol, amount, chain name, and recipient address from the user's message.
+
+User message: "{{userMessage}}"
+
+Return the values in this XML format:
+<response>
+<token>TOKEN_SYMBOL</token>
+<amount>AMOUNT</amount>
+<chain>CHAIN_NAME</chain>
+<to>RECIPIENT_ADDRESS</to>
+</response>
+
+If the message is not a token transfer request, return:
+<response>
+<error>Not a token transfer request</error>
+</response>`;
+
+
 
 /**
  * Example HelloWorld action
@@ -72,27 +109,34 @@ const ccipTransferAction: Action = {
     _responses: Memory[]
   ) => {
     try {
-      
       logger.info('Handling CCIP_TRANSFER action');
 
-      // const client = createWalletClient({
-      //   chain: sepolia,
-      //   transport: http("https://eth-sepolia.g.alchemy.com/v2/pxb3cwnOJLo19ytBM10xZ2HmHUMWEnj3")
-      // })
+      const prompt = tokenTransferTemplate.replace('{{userMessage}}', message.content.text || '');
+      const response = await _runtime.useModel(ModelType.TEXT_SMALL, {
+        prompt,
+        maxTokens: 100,
+      });
+      
+      const parsed = parseKeyValueXml(response);
+      
+      // ❌ Fallback if not a proper transfer request
+      if (!parsed || parsed.error || !parsed.token || !parsed.chain || !parsed.to || !parsed.amount) {
+        return { text: '', data: {}, values: {} };
+      }
+      
+      // ✅ Normalized values
+      const token = parsed.token.toUpperCase();
+      const chain = parsed.chain.toLowerCase();
+      const recipient = parsed.to;
+      const amount = parsed.amount;
+      console.log("token, chain, recipient, amount", token, chain, recipient, amount);
 
-      // const account = privateKeyToAccount("")
 
-      // const hash = await client.sendTransaction({
-      //   account, 
-      //   to: '0x98692B795D1fB6072de084728f7cC6d56100b807',
-      //   value: parseEther('0.001')
-      // })
-
-      const result = await transferFromFirstAvailableChain();
-      const { txHash, chain } = result!;
+      const result = await transferFromFirstAvailableChain(token, chain, recipient, amount);
+      const { txhash } = result!;
       // Simple response content
       const responseContent: Content = {
-        text: txHash,
+        text: txhash,
         actions: ['CCIP_TRANSFER'],
         source: message.content.source,
       };
@@ -188,7 +232,7 @@ const plugin: Plugin = {
   async init(config: Record<string, string>) {
     logger.info('*** Initializing starter plugin ***');
     try {
-      const validatedConfig = await configSchema.parseAsync(config);
+      const validatedConfig = await transferSchema.parseAsync(config);
 
       // Set all environment variables at once
       for (const [key, value] of Object.entries(validatedConfig)) {
