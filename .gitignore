@@ -137,3 +137,6 @@ dist
 /ccipbird/.eliza
 /ccipbird/src/__tests__
 /ccipbird/.elizadb-test
+/my-agent/.eliza
+/my-agent/src/__tests__/cypress/component
+/my-agent/src/__tests__
