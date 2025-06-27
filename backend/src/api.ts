@@ -78,9 +78,10 @@ app.post('/transfer', async (req: any, res: any) => {
         chain: destConfig.chain,
         transport: http(destConfig.rpcUrl),
     });
-    console.log("CHAIN_ADDRESSES[chain_destination].usdc", CHAIN_ADDRESSES["sepolia"].usdc)
+    console.log("chain_destination", chain_destination)
+    console.log("CHAIN_ADDRESSES[chain_destination].usdc", CHAIN_ADDRESSES[chain_destination.toLowerCase()].usdc )
     const balance = await publicClient.readContract({
-        address: CHAIN_ADDRESSES[chain_destination].usdc as `0x${string}`,
+        address: CHAIN_ADDRESSES[chain_destination.toLowerCase()].usdc as `0x${string}`,
         abi: erc20Abi,
         functionName: 'balanceOf',
         args: [account.address],
@@ -120,10 +121,10 @@ app.post('/transfer', async (req: any, res: any) => {
                   chain,
                   transport: http(rpcUrl),
               }); 
-              console.log("chain.name", chain.name)
-              console.log("CHAIN_ADDRESSES[chain.name].usdc", CHAIN_ADDRESSES[chain.name.toLowerCase()].usdc)
+              console.log("chain.name", name.toLowerCase())
+              console.log("CHAIN_ADDRESSES[chain.name].usdc", CHAIN_ADDRESSES[name.toLowerCase()].usdc)
               const balance = await publicClient.readContract({
-                  address: CHAIN_ADDRESSES[chain.name.toLowerCase()].usdc as `0x${string}`,
+                  address: CHAIN_ADDRESSES[name.toLowerCase()].usdc as `0x${string}`,
                   abi: erc20Abi,
                   functionName: 'balanceOf',
                   args: [account.address],
@@ -155,7 +156,7 @@ app.post('/transfer', async (req: any, res: any) => {
                   tokenAddress: CHAIN_ADDRESSES[chain.name.toLowerCase()].usdc as `0x${string}`,
                   amount: 1000n,
                   destinationAccount: TO_ADDRESS,
-                  destinationChainSelector: CHAIN_ADDRESSES[chain_destination].chainSelector as `0x${string}`,
+                  destinationChainSelector: CHAIN_ADDRESSES[chain_destination.toLowerCase()].chainSelector as `0x${string}`,
                   })
 
                   console.log("fee", fee)
@@ -166,19 +167,36 @@ app.post('/transfer', async (req: any, res: any) => {
                       tokenAddress: CHAIN_ADDRESSES[chain.name.toLowerCase()].usdc as `0x${string}`,
                       amount: 1000n,
                       destinationAccount: TO_ADDRESS,
-                      destinationChainSelector: CHAIN_ADDRESSES[chain_destination].chainSelector as `0x${string}`,
+                      destinationChainSelector: CHAIN_ADDRESSES[chain_destination.toLowerCase()].chainSelector as `0x${string}`,
                   })
                   console.log("transferTxHash", transferTxHash)
                   console.log("messageId", messageId)
                   console.log(`Transfer success. Transaction hash: ${transferTxHash}. Message ID: ${messageId}`)
+
+                  return res.json({
+                    success: true,
+                    method: 'ccip',
+                    from: name,
+                    txhash: transferTxHash,
+                    messageId
+                  });
               }
 
               else {
                   console.log(`🚫 Balance is not enough on ${name}`);
+                  // return res.status(400).json({
+                  //   success: false,
+                  //   error: 'No eligible chain found with sufficient balance.',
+                  // });
               }
 
           } catch (err) {
               console.error(`❌ Error on ${name}: ${(err as Error).message}\n`);
+              console.error('Error occurred:', (err as Error).stack);
+              return res.status(500).json({
+                success: false,
+                error: `Error on ${name}: ${(err as Error).message}`,
+              });
           }
       }
   }
